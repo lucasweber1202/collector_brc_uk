@@ -1,7 +1,7 @@
 """Build and idempotently upsert BRC metadata after observation writes.
 
-Extends the fleet metadata contract with the vendor provenance columns declared
-in scripts/init_db.py, and enforces the one rule that keeps the architecture
+Writes the standardized fleet metadata contract unchanged -- vendor provenance
+lives in scripts/vendor_provenance.py -- and enforces the one rule that keeps the architecture
 honest: `original_publisher` is the British Retail Consortium, and the delivery
 provider is recorded separately.
 """
@@ -96,24 +96,7 @@ ECO_GROUPS = frozenset(
 # Vendor provenance is compared like every other metadata field, so a run that
 # switched delivery provider updates the row instead of leaving it claiming a
 # route that no longer produced the history.
-_VENDOR_COLUMNS = (
-    "seasonal_adjustment",
-    "original_publisher",
-    "delivery_provider",
-    "vendor_series_id",
-    "vendor_field",
-    "vendor_description",
-    "survey",
-    "measure",
-    "category",
-    "reference_date_rule",
-    "release_rule",
-    "revision_policy",
-    "license_context",
-    "history_start",
-)
 _COMPARABLE_COLUMNS = (
-    "source_id",
     "name",
     "description",
     "country",
@@ -125,7 +108,6 @@ _COMPARABLE_COLUMNS = (
     "eco_group",
     "source_url",
     "last_publish_date",
-    *_VENDOR_COLUMNS,
 )
 _COLUMNS = ("series_id", *_COMPARABLE_COLUMNS, "collected_at")
 _UPDATE_COLUMNS = tuple(column for column in _COLUMNS if column != "series_id")
@@ -175,7 +157,7 @@ def _as_date(value: object) -> date | None:
 
 def validate_catalog(catalog: dict[str, dict[str, Any]]) -> None:
     for series_id, fields in sorted(catalog.items()):
-        for key in ("source_id", "name", "source_url"):
+        for key in ("name", "source_url"):
             if not str(fields.get(key, "")).strip():
                 raise ValueError(f"{series_id} metadata is missing required field {key!r}")
         if fields["frequency"] not in FREQUENCIES:
@@ -238,7 +220,6 @@ def upsert_metadata(
         desired.append(
             {
                 "series_id": series_id,
-                "source_id": fields["source_id"],
                 "name": fields["name"],
                 "description": fields.get("description"),
                 "country": COUNTRY_CURRENCY,
@@ -250,7 +231,6 @@ def upsert_metadata(
                 "eco_group": fields["eco_group"],
                 "source_url": fields["source_url"],
                 "last_publish_date": fields.get("last_publish_date"),
-                **{column: fields.get(column) for column in _VENDOR_COLUMNS},
                 "collected_at": collected_at,
             }
         )

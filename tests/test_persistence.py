@@ -29,6 +29,7 @@ from scripts.extract import CollectedData, assemble
 from scripts.metadata import upsert_metadata
 from scripts.normalize import VendorRow
 from scripts.snapshots import upsert_snapshots
+from scripts.vendor_provenance import upsert_vendor_provenance
 from scripts.time_series import upsert_time_series
 from tests.conftest import bloomberg_response, lseg_response, make_mapping, synthetic_rows
 
@@ -47,6 +48,7 @@ def _run(engine: Engine, data: CollectedData, collected_at: datetime) -> dict[st
         rows = main.availability_rows(data, result, collected_at)
         availability = upsert_availability(conn, rows, collected_at)
         inserted, updated = upsert_metadata(conn, data.catalog, collected_at)
+        v_inserted, v_updated = upsert_vendor_provenance(conn, data.catalog, collected_at)
     return {
         "observations": result.new_observations,
         "vintages": result.new_vintages,
@@ -54,6 +56,8 @@ def _run(engine: Engine, data: CollectedData, collected_at: datetime) -> dict[st
         "snapshots": snapshots,
         "metadata_inserted": inserted,
         "metadata_updated": updated,
+        "vendor_inserted": v_inserted,
+        "vendor_updated": v_updated,
     }
 
 
@@ -94,6 +98,8 @@ def test_run_two_unchanged_writes_nothing(engine: Engine) -> None:
         "snapshots": 0,
         "metadata_inserted": 0,
         "metadata_updated": 0,
+        "vendor_inserted": 0,
+        "vendor_updated": 0,
     }
     assert _count(engine, "time_series") == 6
     assert _count(engine, "source_snapshots") == 1
@@ -271,12 +277,12 @@ def test_an_observation_reconstructs_its_full_provenance(engine: Engine) -> None
         row = (
             conn.execute(
                 text(
-                    "SELECT m.original_publisher, s.delivery_provider, s.vendor_series_id, "
+                    "SELECT v.original_publisher, s.delivery_provider, s.vendor_series_id, "
                     "       s.vendor_field, s.fetched_at, a.reference_date, a.vintage_date, "
                     "       a.available_at, a.availability_basis, s.snapshot_id "
                     f"FROM {SCHEMA_NAME}.availability a "
                     f"JOIN {SCHEMA_NAME}.source_snapshots s ON s.snapshot_id = a.source_snapshot_id "
-                    f"JOIN {SCHEMA_NAME}.metadata m ON m.series_id = a.series_id "
+                    f"JOIN {SCHEMA_NAME}.vendor_provenance v ON v.series_id = a.series_id "
                     "WHERE a.series_id = :series LIMIT 1"
                 ),
                 {"series": SERIES},
@@ -303,12 +309,15 @@ def test_switching_provider_does_not_create_a_second_economic_series(engine: Eng
             .all()
         )
         provider = conn.execute(
-            text(f"SELECT delivery_provider FROM {SCHEMA_NAME}.metadata WHERE series_id = :s"),
+            text(f"SELECT delivery_provider FROM {SCHEMA_NAME}.vendor_provenance WHERE series_id = :s"),
             {"s": SERIES},
         ).scalar_one()
     assert series_ids == [SERIES]
     assert summary["observations"] == 0, "the same values delivered by another vendor are not new"
-    assert summary["metadata_updated"] == 1
+    assert summary["metadata_updated"] == 0, (
+        "a vendor switch is not an economic change and must not touch metadata"
+    )
+    assert summary["vendor_updated"] == 1
     assert provider == "lseg"
 
 
