@@ -11,10 +11,10 @@ Price Index. That is the economic fact this collector stores.
 
 **Bloomberg** and **LSEG** are licensed delivery providers. They are how the
 desk lawfully obtains the series; they are not its author. The distinction is
-enforced in code, not only in prose: `metadata.original_publisher` must name
+enforced in code, not only in prose: `vendor_provenance.original_publisher` must name
 BRC, and `scripts/metadata.py` rejects a row that names a delivery provider
-there. Provider identity lives in `metadata.delivery_provider`,
-`metadata.vendor_series_id`, `metadata.vendor_field` and in the vendor columns
+there. Provider identity lives in `vendor_provenance.delivery_provider`,
+`vendor_provenance.vendor_series_id`, `vendor_provenance.vendor_field` and in the vendor columns
 of `source_snapshots`.
 
 This is why there is no `collector_bloomberg_uk` and no `collector_reuters_uk`.
@@ -34,18 +34,18 @@ A computed rate is a research transformation and belongs in
 `uk_inflation_predictors`, alongside the lags and the MoM/YoY features the
 research layer builds for every predictor.
 
-## The five tables
+## Database tables
 
-`metadata`, `time_series`, `availability`, `source_snapshots`, `logs` — the
-fleet shape, in a schema named `collector_brc_uk`.
+`metadata`, `time_series`, `availability`, `source_snapshots`, `logs`, `vendor_provenance` — the
+five base fleet tables plus one source-specific table, in a schema named `collector_brc_uk`.
 
 Two documented deviations, both forced by the delivery model rather than chosen:
 
-1. `metadata` carries vendor provenance and survey dimensions
+1. `vendor_provenance` carries vendor provenance and survey dimensions
    (`original_publisher`, `delivery_provider`, `vendor_series_id`,
    `vendor_field`, `vendor_description`, `survey`, `measure`, `category`,
    `seasonal_adjustment`, `reference_date_rule`, `release_rule`,
-   `revision_policy`, `license_context`, `history_start`), plus the fleet's
+   `revision_policy`, `license_context`, `history_start`), plus its source-specific
    `source_id`.
 2. `source_snapshots` carries `delivery_provider`, `vendor_series_id`,
    `vendor_field`, `vendor_query` and `vendor_row_count`, because `source_url`

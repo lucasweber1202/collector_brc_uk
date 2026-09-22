@@ -80,6 +80,7 @@ def test_run_one_inserts_the_full_history(engine: Engine) -> None:
     assert summary["snapshots"] == 1
     assert summary["metadata_inserted"] == 1
     assert _count(engine, "time_series") == 6
+    assert _count(engine, "vendor_provenance") == 1
 
 
 def test_run_two_unchanged_writes_nothing(engine: Engine) -> None:
@@ -97,6 +98,7 @@ def test_run_two_unchanged_writes_nothing(engine: Engine) -> None:
     }
     assert _count(engine, "time_series") == 6
     assert _count(engine, "source_snapshots") == 1
+    assert _count(engine, "vendor_provenance") == 1
 
 
 def test_an_unchanged_rerun_reproduces_the_snapshot_digest(engine: Engine) -> None:
@@ -284,12 +286,12 @@ def test_an_observation_reconstructs_its_full_provenance(engine: Engine) -> None
         row = (
             conn.execute(
                 text(
-                    "SELECT m.original_publisher, s.delivery_provider, s.vendor_series_id, "
+                    "SELECT v.original_publisher, s.delivery_provider, s.vendor_series_id, "
                     "       s.vendor_field, s.fetched_at, a.reference_date, a.vintage_date, "
                     "       a.available_at, a.availability_basis, s.snapshot_id "
                     f"FROM {SCHEMA_NAME}.availability a "
                     f"JOIN {SCHEMA_NAME}.source_snapshots s ON s.snapshot_id = a.source_snapshot_id "
-                    f"JOIN {SCHEMA_NAME}.metadata m ON m.series_id = a.series_id "
+                    f"JOIN {SCHEMA_NAME}.vendor_provenance v ON v.series_id = a.series_id "
                     "WHERE a.series_id = :series LIMIT 1"
                 ),
                 {"series": SERIES},
@@ -316,7 +318,9 @@ def test_switching_provider_does_not_create_a_second_economic_series(engine: Eng
             .all()
         )
         provider = conn.execute(
-            text(f"SELECT delivery_provider FROM {SCHEMA_NAME}.metadata WHERE series_id = :s"),
+            text(
+                f"SELECT delivery_provider FROM {SCHEMA_NAME}.vendor_provenance WHERE series_id = :s"
+            ),
             {"s": SERIES},
         ).scalar_one()
     assert series_ids == [SERIES]
