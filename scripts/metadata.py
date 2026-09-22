@@ -40,7 +40,6 @@ UNITS = frozenset(
         "index",
         "percent",
         "ratio",
-        "balance",
         "persons",
         "currency",
         "count",
