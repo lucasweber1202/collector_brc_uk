@@ -9,7 +9,13 @@ from pathlib import Path
 import pytest
 
 from scripts.config import PROVIDERS, SCHEMA_NAME, VENDOR_SERIES_FILE
-from scripts.series_catalog import ALL_SERIES, CORE_SERIES, SERIES_BY_ID, parse_series_id
+from scripts.series_catalog import (
+    ALL_SERIES,
+    CORE_SERIES,
+    SERIES_BY_ID,
+    describe_series_id,
+    parse_series_id,
+)
 from scripts.vendor_registry import FIELDNAMES, PENDING, load_registry, pending_for, resolved_for
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,9 +46,9 @@ def test_series_ids_are_economic_and_carry_no_vendor_identity() -> None:
             assert vendor_token not in upper
 
 
-def test_every_series_id_round_trips_through_parse_series_id() -> None:
+def test_every_series_id_decomposes_to_its_catalog_facts() -> None:
     for series in ALL_SERIES:
-        publisher, survey, category, measure = parse_series_id(series.series_id)
+        publisher, survey, category, measure = describe_series_id(series.series_id)
         assert publisher == "BRC"
         assert (category, measure) == (series.category, series.measure)
         assert survey == "shop_price_monitor"
@@ -245,3 +251,11 @@ def test_scripts_is_a_flat_module_directory() -> None:
         if entry.is_dir() and entry.name != "__pycache__"
     ]
     assert subdirectories == []
+
+
+def test_every_series_id_round_trips(_: None = None) -> None:
+    """The fleet contract: build_series_id(*parse_series_id(sid)) == sid."""
+    from scripts.extract import build_series_id
+
+    for series in ALL_SERIES:
+        assert build_series_id(*parse_series_id(series.series_id)) == series.series_id

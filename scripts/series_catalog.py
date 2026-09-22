@@ -202,7 +202,7 @@ ALL_SERIES: tuple[SeriesDefinition, ...] = CORE_SERIES + OPTIONAL_SERIES
 SERIES_BY_ID: dict[str, SeriesDefinition] = {series.series_id: series for series in ALL_SERIES}
 
 
-def parse_series_id(series_id: str) -> tuple[str, str, str, str]:
+def describe_series_id(series_id: str) -> tuple[str, str, str, str]:
     """Decompose a canonical id into (publisher, survey, category, measure).
 
     Round-trips with the catalog: every id is BRC_SHOP_PRICE_<CATEGORY>_<MEASURE>
@@ -210,5 +210,19 @@ def parse_series_id(series_id: str) -> tuple[str, str, str, str]:
     """
     definition = SERIES_BY_ID.get(series_id)
     if definition is None:
-        raise KeyError(f"{series_id} is not a canonical BRC series")
+        raise ValueError(f"{series_id} is not a canonical BRC series")
     return ("BRC", SURVEY_SHOP_PRICE, definition.category, definition.measure)
+
+
+def parse_series_id(series_id: str) -> tuple[str, ...]:
+    """Split a canonical id into its raw underscore components.
+
+    This is the fleet contract (GUIDELINES.md 4): uppercase, underscore
+    separated, ordered coarse -> fine, and exactly reversible, so
+    build_series_id(*parse_series_id(sid)) == sid. The semantic view -- which
+    survey, category and measure an id denotes -- is describe_series_id, and
+    the catalog itself carries those facts.
+    """
+    if series_id not in SERIES_BY_ID:
+        raise ValueError(f"{series_id} is not a canonical BRC series")
+    return tuple(series_id.split("_"))
