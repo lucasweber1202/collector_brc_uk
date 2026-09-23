@@ -88,7 +88,7 @@ def london_midnight_utc(day: date) -> datetime:
 def normalise_reference_date(value: date | datetime | str) -> date:
     """Collapse a provider's month stamp onto the first day of that month."""
     if isinstance(value, str):
-        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        value = datetime.fromisoformat(value)
     if isinstance(value, datetime):
         value = value.date()
     if not isinstance(value, date):
