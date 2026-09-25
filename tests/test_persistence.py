@@ -8,11 +8,12 @@ fleet's definition of done names — fresh build, unchanged rerun, later revisio
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import Row, text
 from sqlalchemy.engine import Engine
 
 import main
@@ -146,7 +147,7 @@ def test_a_later_day_revision_adds_a_vintage_and_keeps_the_old_one(engine: Engin
     assert summary["vintages"] == 1
     assert summary["observations"] == 0
     with engine.connect() as conn:
-        stored = conn.execute(
+        stored: Sequence[Row[Any]] = conn.execute(
             text(
                 f"SELECT value, vintage_date FROM {SCHEMA_NAME}.time_series "
                 "WHERE series_id = :series AND reference_date = :reference "
@@ -168,7 +169,7 @@ def test_a_same_day_revision_updates_in_place(engine: Engine) -> None:
     assert summary["vintages"] == 0, "a same-day revision opens no new vintage"
     assert _count(engine, "time_series") == 4, "and creates no extra row"
     with engine.connect() as conn:
-        stored = conn.execute(
+        stored: float = conn.execute(
             text(f"SELECT value FROM {SCHEMA_NAME}.time_series WHERE reference_date = :ref"),
             {"ref": revised[1].reference_date},
         ).scalar_one()
@@ -319,12 +320,12 @@ def test_switching_provider_does_not_create_a_second_economic_series(engine: Eng
     _run(engine, _collect(rows, provider="bloomberg"), datetime(2026, 9, 17, 9, tzinfo=UTC))
     summary = _run(engine, _collect(rows, provider="lseg"), datetime(2026, 9, 18, 9, tzinfo=UTC))
     with engine.connect() as conn:
-        series_ids = (
+        series_ids: Sequence[str] = (
             conn.execute(text(f"SELECT DISTINCT series_id FROM {SCHEMA_NAME}.time_series"))
             .scalars()
             .all()
         )
-        provider = conn.execute(
+        provider: str = conn.execute(
             text(
                 f"SELECT delivery_provider FROM {SCHEMA_NAME}.vendor_provenance WHERE series_id = :s"
             ),
